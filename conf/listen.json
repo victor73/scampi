@@ -1,0 +1,23 @@
+{
+  "/queue/test.q": [
+    {
+      "description": "Test queue processor",
+      "user": "user1",
+      "script": "/path/to/queue_processor.sh"
+    }
+  ],
+  "/queue/test2.q": [
+    {
+      "description": "Second test queue processor",
+      "user": "user2",
+      "script": "/path/to/queue_processor_2.sh"
+    }
+  ],
+  "/topic/roster": [
+    {
+      "description": "Test topic processor",
+      "user": "user3",
+      "script": "/path/to/topic_processor.sh"
+    }
+  ]
+}
