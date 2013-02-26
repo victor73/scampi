@@ -1,7 +1,13 @@
 #!/bin/bash
 
 NAME=scampi
-VERSION=0.1
+VERSION=0.2
+RPM_RELEASE=1
+
+# Do some token replacement on the .spec token file
+cat $NAME.spec.template | sed -e "s/@NAME@/$NAME/" \
+     -e "s/@RELEASE@/$RPM_RELEASE/" \
+     -e "s/@VERSION@/$VERSION/" > $NAME.spec
 
 TMPDIR=`mktemp -d`
 mkdir $TMPDIR/"$NAME-$VERSION"
