@@ -12,7 +12,6 @@ var sleep = require('sleep');
 var log4js = require('log4js');
 
 var client_id;
-var stdlog = console.log; // Save the old log function
 var logger = null;
 var message_count = 0;
 var messaging_server;
@@ -118,12 +117,7 @@ function start_listening(listener_path, callback) {
 function setup_listeners(client, endpoints) {
     logger.debug("In setup_listeners.");
 
-    // Suppress the STDOUT on bad connections    
-    console.log = function(e) {};
-
     client.on('connected', function() {
-        // Restore regular console.log
-        console.log = stdlog;
         logger.info("Connected to " + messaging_server + ".");
 
         var destination = null;
@@ -161,24 +155,24 @@ function setup_listeners(client, endpoints) {
                                      user: username,
                                      script: script };
 
-                    console.log("Invoking " + script + " as user: " + username);
+                    logger.info("Invoking " + script + " as user: " + username);
 
                     try {
                         var forked = fork("forked.js");
 
                         forked.send(job_spec);
                     } catch (e) {
-                        console.log("Error invoking " + script);
+                        logger.error("Error invoking " + script);
                     }
                 } else {
-                    console.log("Invalid spec encountered. Both 'user' and 'script' and required.");
+                    logger.error("Invalid spec encountered. Both 'user' and 'script' and required.");
                 }
             });
         }
     });
 
     client.on('error', function(error_frame) {
-        console.error("Error: " + error_frame['body']);
+        logger.error("Error: " + error_frame['body']);
         reconnect(client);
     });
 
@@ -248,8 +242,7 @@ function main() {
     });
 
     process.on('uncaughtException', function(err) {
-        logger.error("Caught exception: ", err);
-        console.log(err.stack);
+        logger.error("Caught exception: ", err.stack);
     });
 }
 

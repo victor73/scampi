@@ -3,7 +3,7 @@
 use strict;
 use Net::Stomp;
 
-my $stomp = Net::Stomp->new( {hostname => "activemq.igs.umaryland.edu", port => 61613});
+my $stomp = Net::Stomp->new( {hostname => "messaging.server.example.com", port => 61613} );
 
 #$stomp->connect({ login => "user", passcode => "password" });
 $stomp->connect();

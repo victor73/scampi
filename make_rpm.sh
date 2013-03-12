@@ -2,7 +2,8 @@
 
 NAME=scampi
 VERSION=0.2
-RPM_RELEASE=1
+RPM_RELEASE=2
+ARCH=noarch
 
 # Do some token replacement on the .spec token file
 cat $NAME.spec.template | sed -e "s/@NAME@/$NAME/" \
@@ -12,6 +13,7 @@ cat $NAME.spec.template | sed -e "s/@NAME@/$NAME/" \
 TMPDIR=`mktemp -d`
 mkdir $TMPDIR/"$NAME-$VERSION"
 cp -p $NAME.js $TMPDIR/"$NAME-$VERSION"
+cp -p forked.js $TMPDIR/"$NAME-$VERSION"
 cp -pr conf $TMPDIR/"$NAME-$VERSION"
 cp -pr node_modules $TMPDIR/"$NAME-$VERSION"
 cp -pr examples $TMPDIR/"$NAME-$VERSION"
@@ -34,7 +36,8 @@ mv $NAME-$VERSION.tar.gz $RPMTMP/SOURCES
 rpmbuild -bb --define="_topdir $PWD/$RPMTMP" $NAME.spec
 
 if [ $? == "0" ]; then
-    cp $RPMTMP/RPMS/noarch/*.rpm $PWD && rm -rf "$RPMTMP"
+    cp $RPMTMP/RPMS/$ARCH/*.rpm $PWD && rm -rf "$RPMTMP"
+    rm $NAME.spec
 fi
 
 

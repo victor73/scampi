@@ -5,11 +5,11 @@
 
 %define debug_package %{nil}
 
-Summary: scampi - Listening and responding to events.
-Name: scampi
-Version: 0.1
+Summary: @NAME@ - Listening and responding to events.
+Name: @NAME@
+Version: @VERSION@
 Distribution:   Red Hat Enterprise Linux 5
-Release: 1
+Release: @RELEASE@
 License: Artistic
 Group: Misc
 URL: http://www.igs.umaryland.edu
@@ -60,6 +60,7 @@ mkdir -p ${RPM_BUILD_ROOT}/usr/lib/%{lcName}
 %{__mkdir} -p %{buildroot}/%{_sysconfdir}/logrotate.d
 
 %{__cp} %{lcName}.js ${RPM_BUILD_ROOT}/usr/bin/
+%{__cp} forked.js ${RPM_BUILD_ROOT}/usr/lib/%{lcName}
 %{__cp} rpm/init.sh %{buildroot}/%{_sysconfdir}/init.d/%{lcName}
 %{__cp} rpm/logrotate.conf %{buildroot}%{_sysconfdir}/logrotate.d/%{lcName}
 sed -i -e "s/@NAME@/%{lcName}/" %{buildroot}/%{_sysconfdir}/logrotate.d/%{lcName}
@@ -82,5 +83,8 @@ sed -i -e "s/@NAME@/%{lcName}/" %{buildroot}/%{_sysconfdir}/logrotate.d/%{lcName
 %dir %{_localstatedir}/log/%{lcName}
 
 %changelog
+* Mon Feb 25 2013 victor73@github
+- Added missing forked.js file
+
 * Sat Jul 21 2012 victor73@github
 - Initial version
