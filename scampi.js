@@ -15,7 +15,7 @@ var client_id;
 var logger = null;
 var message_count = 0;
 var messaging_server;
-var messaging_port; 
+var messaging_port;
 var debug = false;
 
 function setup(callback) {
@@ -104,7 +104,7 @@ function start_listening(listener_path, callback) {
                 debug: debug
             };
 
-            var client = new stomp.Stomp(stomp_args);
+            var client = new stomp().Client(stomp_args)
 
             callback(client, endpoints);
         } else {
@@ -169,6 +169,11 @@ function setup_listeners(client, endpoints) {
                 }
             });
         }
+    });
+
+    client.on('disconnected', function(error_frame) {
+        logger.error("Detected disconnect. Attempting to reconnect.")
+        reconnect(client);
     });
 
     client.on('error', function(error_frame) {
