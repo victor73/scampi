@@ -61,8 +61,7 @@ start_app () {
     fi
     pushd "$APP_HOME" >/dev/null 2>&1
     APP_ARGS="--config /etc/$LCNAME/config.ini --listen /etc/$LCNAME/listen.json --logfile $LOG"
-    start_daemon $NODE /usr/bin/${LCNAME}.js $APP_ARGS &
-    #daemon $NODE /usr/bin/${LCNAME}.js $APP_ARGS &
+    nohup $NODE /usr/bin/${LCNAME}.js $APP_ARGS > /dev/null 2>&1 &
     local START_RV=$?
 
     if [ "$START_RV" == "0" ]; then

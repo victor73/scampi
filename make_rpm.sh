@@ -1,7 +1,7 @@
 #!/bin/bash
 
 NAME=scampi
-VERSION=0.2
+VERSION=0.3
 RPM_RELEASE=2
 ARCH=noarch
 
