@@ -1,8 +1,8 @@
 #!/bin/bash
 
 NAME=scampi
-VERSION=0.3
-RPM_RELEASE=2
+VERSION=0.4
+RPM_RELEASE=1
 ARCH=noarch
 
 # Do some token replacement on the .spec token file

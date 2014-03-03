@@ -83,7 +83,12 @@ sed -i -e "s/@NAME@/%{lcName}/" %{buildroot}/%{_sysconfdir}/logrotate.d/%{lcName
 %dir %{_localstatedir}/log/%{lcName}
 
 %changelog
+* Mon Mar 03 2014 victor73@github
+- Version 0.4
+- Using forked version of stomp.js that fires disconnect events
+
 * Mon Feb 25 2013 victor73@github
+- Version 0.3
 - Added missing forked.js file
 
 * Sat Jul 21 2012 victor73@github
