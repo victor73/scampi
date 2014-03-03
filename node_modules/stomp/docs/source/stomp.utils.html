@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>The source code</title>
+  <link href="../resources/prettify/prettify.css" type="text/css" rel="stylesheet" />
+  <script type="text/javascript" src="../resources/prettify/prettify.js"></script>
+  <style type="text/css">
+    .highlight { display: block; background-color: #ddd; }
+  </style>
+  <script type="text/javascript">
+    function highlight() {
+      document.getElementById(location.hash.replace(/#/, "")).className = "highlight";
+    }
+  </script>
+</head>
+<body onload="prettyPrint(); highlight();">
+  <pre class="prettyprint lang-js"><span id='StompUtils'>/**
+</span> * @class StompUtils
+ * An instance of the StompJS helper utilities
+ *
+ * @type {StompJS.StompUtils}
+ */
+var StompUtils = module.exports = function() {
+    &quot;use strict&quot;;
+
+<span id='StompUtils-method-isDefined'>    /**
+</span>     * Returns if the input is defined (not null or undefined)
+     *
+     * @param {Object}  varToTest   the variable to test
+     * @returns {Boolean}           returns *true* if the input is defined; otherwise, *false*
+     */
+    var isDefined = function(varToTest) {
+        return !(varToTest === null || typeof varToTest === &quot;undefined&quot;);
+    };
+
+<span id='StompUtils-method-extend'>    /**
+</span>     * Extends the destination by adding any source properties
+     *
+     * @param {Object}      destination     the object to extend
+     * @param {Object}      source          the object to extend from
+     * @returns {Object}                    returns the extended object
+     */
+    var extend = function(destination, source) {
+        if (!isDefined(destination)) {return destination;}
+        if (!isDefined(source)) {return destination;}
+        for (var property in source) {
+            if (source.hasOwnProperty(property)) {
+                destination[property] = source[property];
+            }
+        }
+        return destination;
+    };
+
+    return {
+        isDefined: isDefined,
+        extend: extend
+    };
+};
+</pre>
+</body>
+</html>

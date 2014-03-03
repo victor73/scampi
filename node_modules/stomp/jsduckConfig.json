@@ -1,0 +1,11 @@
+{
+    "--output": "docs",
+    "--warnings": ["-link","-no_doc","-link_ambiguous"],
+    "--categories": "jsduckCategories.json",
+    "--": [
+        "lib/frame.js",
+        "lib/stomp.js",
+        "lib/stomp.logger.js",
+        "lib/stomp.utils.js"
+    ]
+}

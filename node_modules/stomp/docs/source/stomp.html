@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>The source code</title>
+  <link href="../resources/prettify/prettify.css" type="text/css" rel="stylesheet" />
+  <script type="text/javascript" src="../resources/prettify/prettify.js"></script>
+  <style type="text/css">
+    .highlight { display: block; background-color: #ddd; }
+  </style>
+  <script type="text/javascript">
+    function highlight() {
+      document.getElementById(location.hash.replace(/#/, "")).className = "highlight";
+    }
+  </script>
+</head>
+<body onload="prettyPrint(); highlight();">
+  <pre class="prettyprint lang-js"><span id='Stomp'>/**
+</span> * @class Stomp
+ * An instance of the Stomp object for interacting with STOMP messaging brokers
+ *
+ * @type {StompJS.Stomp}
+ */
+var Stomp = module.exports = function() {
+    &quot;use strict&quot;;
+
+    var errMsgNotInitialized = &quot;not initialized&quot;;
+    var errMsgNotConnected = &quot;not connected&quot;;
+
+    var events = require('events');
+    var Frame = require('./frame.js');
+
+    var StompUtils = require('./stomp.utils.js');
+    var stompUtils = new StompUtils();
+
+    var net, tls, sys, log;
+
+    var _initialized = false;
+    var _connected = false;
+    var options = {};
+    var subscribedTo, session, socket, thisPointer;
+
+<span id='Stomp-method-Client'>    /**
+</span>     * @method Client
+     *
+     * Creates a client for the {@link StompJS.Stomp} object.
+     *
+     * @param {Object}     args    arguments needed to create the client
+     *
+     * ***Example:***
+     *
+     *      args = {
+     *          port: 61613,
+     *          host: 'localhost',
+     *          debug: false,
+     *          login: 'guest',
+     *          passcode: 'guest'
+     *      }
+     *
+     *      If debug is set to true, extra output will be printed to the console.
+     *
+     *      var client = new Stomp().Client(args);
+     *
+     * @returns {Object}                    returns StompClient
+     */
+    var Client = function(args) {
+        net = require('net');
+        tls = require('tls');
+        sys = require('util');
+
+        options.port = args.port || 61613;
+        options.host = args.host || '127.0.0.1';
+        options.login = args.login || null;
+        options.passcode = args.passcode || null;
+        options.ssl = args.ssl ? true : false;
+        options.sslValidate = args.ssl_validate ? true : false;
+        options.sslOptions = args.ssl_options || {};
+        options.clientId = args['client-id'] || null;
+        options.vhost = args.vhost || null;
+
+        var debug = args.debug || false;
+        var StompLogger = require('./stomp.logger.js');
+        log = new StompLogger(debug);
+
+        subscribedTo = {};
+        session = null;
+        socket = null;
+
+        // Stomp is an EventEmitter
+        stompUtils.extend(this, events.EventEmitter.prototype );
+
+        // need to save ref to this object for emitWrapper
+        // TODO: maybe use .call(this)
+        thisPointer = this;
+
+        _initialized = true;
+        return this;
+    };
+
+<span id='Stomp-method-isInitialized'>    /**
+</span>     * Returns if the object has been initialized
+     *
+     * @returns {Boolean}            returns *true* if initialized; otherwise, *false*
+     */
+    var isInitialized = function() {
+        return _initialized;
+    };
+
+<span id='Stomp-method-isConnected'>    /**
+</span>     * Returns if the object has been connected
+     *
+     * @returns {Boolean}            returns *true* if connected; otherwise, *false*
+     */
+    var isConnected = function() {
+        return _connected;
+    };
+
+<span id='Stomp-method-connect'>    /**
+</span>     * Creates sockets used to connect to STOMP broker. Sets the connected flag to *true* upon completion.
+     * Emits &quot;connected&quot; upon completion.
+     *
+     * @returns {void}
+     */
+    var connect = function() {
+        if(!_initialized) {throw new Error(errMsgNotInitialized);}
+
+        var host = options.host;
+        var port = options.port;
+
+        if (options.ssl) {
+            log.debug('Connecting to ' + host + ':' + port + ' using SSL');
+            socket = tls.connect(port, host, options.sslOptions, function() {
+                log.debug('SSL connection complete');
+                if (!socket.authorized) {
+                    log.error('SSL is not authorized: '+ socket.authorizationError);
+                    if (options.sslValidate) {
+                        disconnect();
+                        return;
+                    }
+                }
+                setupListeners();
+            });
+        }
+        else {
+            log.debug('Connecting to ' + host + ':' + port);
+            socket = new net.Socket();
+            socket.connect(port, host);
+            setupListeners();
+        }
+        _connected = true;
+    };
+
+<span id='Stomp-method-disconnect'>    /**
+</span>     * Removes sockets used to connects STOMP broker.  Sets the connected flag to *false* upon completion.
+     * Emits &quot;disconnected&quot; upon completion.
+     *
+     * @returns {void}
+     */
+    var disconnect = function() {
+        if(!_initialized) {throw new Error(errMsgNotInitialized);}
+
+        socket.end();
+
+        if (socket.readyState === 'readOnly') {
+            socket.destroy();
+        }
+
+        log.debug('disconnect called');
+        _connected = false;
+    };
+
+<span id='Stomp-method-subscribe'>    /**
+</span>     * Subscribes to destination (queue or topic).
+     * Emits &quot;subscribed&quot; upon completion.
+     *
+     * @param {Object}      headers     a header object
+     * @param {Function}    callback    a function to call and pass it the message that is dequeued
+     * @returns {void}
+     */
+    var subscribe = function(headers, callback) {
+        if(!_initialized) {throw new Error(errMsgNotInitialized);}
+        if(!_connected) {throw new Error(errMsgNotConnected);}
+
+        var destination = headers.destination;
+        headers.session = session;
+
+        if (destination instanceof Array) {
+            for (var i=0; i &lt; destination.length; i++) {
+                headers.destination = destination[i];
+                sendCommand('SUBSCRIBE', headers);
+                subscribedTo[destination[i]] = { enabled: true, callback: callback };
+                log.debug('subscribed to: ' + destination[i] + ' with headers ' + sys.inspect(headers));
+            }
+        }
+        else {
+            sendCommand('SUBSCRIBE', headers);
+            subscribedTo[destination] = { enabled: true, callback: callback };
+            log.debug('subscribed to: ' + destination + ' with headers ' + sys.inspect(headers));
+        }
+
+        emitWrapper(&quot;subscribed&quot;, destination);
+    };
+
+<span id='Stomp-method-unsubscribe'>    /**
+</span>     * Unsubscribes from destination (queue or topic).
+     * Emits &quot;unsubscribed&quot; upon completion.
+     *
+     * @param {Object}      headers     a header object
+     * @returns {void}
+     */
+    var unsubscribe = function(headers) {
+        if(!_initialized) {throw new Error(errMsgNotInitialized);}
+        if(!_connected) {throw new Error(errMsgNotConnected);}
+
+        var destination = headers.destination;
+        headers.session = session;
+
+        if (destination instanceof Array) {
+            for (var i=0; i &lt; destination.length; i++) {
+                headers.destination = destination[i];
+                sendCommand('UNSUBSCRIBE', headers);
+                subscribedTo[destination[i]].enabled = false;
+                log.debug('no longer subscribed to: ' + destination[i]);
+            }
+        }
+        else {
+            sendCommand('UNSUBSCRIBE', headers);
+            subscribedTo[destination].enabled = false;
+            log.debug('no longer subscribed to: ' + destination);
+        }
+
+        emitWrapper(&quot;unsubscribed&quot;, destination);
+    };
+
+<span id='Stomp-method-send'>    /**
+</span>     * Sends a message to the STOMP broker.
+     *
+     * @param {Object}      headers         a header object
+     * @param {Boolean}     wantReceipt     boolean to indicate that you wish to get a receipt (set receipt header)
+     * @returns {Object}                    returns a `Frame` object representing the message sent
+     */
+    var send = function(headers, wantReceipt) {
+        var body = headers.body || null;
+        delete headers.body;
+        headers.session = session;
+        return sendCommand('SEND', headers, body, wantReceipt);
+    };
+
+<span id='Stomp-method-ack'>    /**
+</span>     * Acknowledges a received message.
+     *
+     * @param {String}      messageId       the message id to ack
+     * @returns {void}
+     */
+    var ack = function(messageId) {
+        sendCommand('ACK', {'message-id': messageId});
+        log.debug('acknowledged message: ' + messageId);
+    };
+
+<span id='Stomp-method-begin'>    /**
+</span>     * Begins a transaction.
+     *
+     * @returns {String}    returns a string representing the generated transaction id
+     */
+    var begin = function() {
+        var transactionId = Math.floor(Math.random()*99999999999).toString();
+        sendCommand('BEGIN', {'transaction': transactionId});
+        log.debug('begin transaction: ' + transactionId);
+        return transactionId;
+    };
+
+<span id='Stomp-method-commit'>    /**
+</span>     * Commits a transaction.
+     *
+     * @param {String}      transactionId       the transaction id from {@link Stomp#begin begin} to commit
+     * @returns {void}
+     */
+    var commit = function(transactionId) {
+        sendCommand('COMMIT', {'transaction': transactionId});
+        log.debug('commit transaction: ' + transactionId);
+    };
+
+<span id='Stomp-method-abort'>    /**
+</span>     * Aborts a transaction.
+     *
+     * @param {String}      transactionId       the transaction id from {@link Stomp#begin begin} to abort
+     * @returns {void}
+     */
+    var abort = function(transactionId) {
+        sendCommand('ABORT', {'transaction': transactionId});
+        log.debug('abort transaction: ' + transactionId);
+    };
+
+<span id='Stomp-method-handleNewFrame'>    /**
+</span>     * @private
+     *
+     * Handles frame based on type.  Emits events when needed.
+     * Emits &quot;message&quot; upon message processed
+     * Emits &quot;connected&quot; upon connecting
+     * Emits &quot;receipt&quot; upon message receipt
+     * Emits &quot;error&quot; upon errors
+     *
+     * @param {String}      frame       the frame to handle
+     * @returns {void}
+     */
+    var handleNewFrame = function(frame) {
+        switch (frame.command) {
+        case &quot;MESSAGE&quot;:
+            if (isMessage(frame)) {
+                shouldRunMessageCallback(frame);
+                emitWrapper('message', frame);
+            }
+            break;
+        case &quot;CONNECTED&quot;:
+            log.debug('Connected to STOMP');
+            session = frame.headers.session;
+            emitWrapper('connected');
+            break;
+        case &quot;RECEIPT&quot;:
+            emitWrapper('receipt', frame.headers['receipt-id']);
+            break;
+        case &quot;ERROR&quot;:
+            emitWrapper('error', frame);
+            break;
+        default:
+            log.debug(&quot;Could not parse command: &quot; + frame.command);
+        }
+    };
+
+<span id='Stomp-method-setupListeners'>    /**
+</span>     * @private
+     *
+     * Sets up the listeners for the socket events
+     * Emits &quot;error&quot; upon errors
+     * Emits &quot;disconnected&quot; upon socket close
+     *
+     * @param {String}      frame       the frame to handle
+     * @returns {void}
+     */
+    var setupListeners = function() {
+
+        socket.on('drain', function(data) {
+            log.debug('draining');
+        });
+
+        var buffer = '';
+        socket.on('data', function(chunk) {
+            buffer += chunk;
+            var frames = buffer.split('\0\n');
+
+            // Temporary fix : NULL,LF is not a guaranteed standard, the LF is optional, so lets deal with it.  (Rauls)
+            if (frames.length === 1) {
+                frames = buffer.split('\0');
+            }
+
+            if (frames.length === 1) {return;}
+            buffer = frames.pop();
+
+            var pFrame = null;
+            var moreFrames = true;
+            while (moreFrames) {
+                var frame = frames.shift();
+                if (!frame) {
+                    moreFrames = false;
+                } else {
+                    pFrame = parseFrame(frame);
+                    handleNewFrame(pFrame);
+                }
+            }
+        });
+
+        socket.on('end', function() {
+            log.debug(&quot;end&quot;);
+        });
+
+        socket.on('error', function(error) {
+            log.error(error.stack + 'error name: ' + error.name);
+            emitWrapper(&quot;error&quot;, error);
+        });
+
+        socket.on('close', function(error) {
+            log.debug('disconnected');
+            if (error) {
+                log.error('Disconnected with error: ' + error);
+            }
+            emitWrapper(&quot;disconnected&quot;, error);
+        });
+
+        if (options.ssl) {
+            stompConnect();
+        } else {
+            socket.on('connect', stompConnect);
+        }
+    };
+
+<span id='Stomp-method-stompConnect'>    /**
+</span>     * @private
+     *
+     * Preps for and starts the STOMP connection
+     *
+     * @returns {void}
+     */
+    var stompConnect = function() {
+        log.debug('Connected to socket');
+        var headers = buildHeaders(options);
+
+        var args = {};
+
+        headers = headers || {};
+
+        args.command = 'CONNECT';
+        args.headers = headers;
+
+        var frame = new Frame();
+        var newFrame = frame.buildFrame(args);
+
+        sendFrame(newFrame);
+    };
+
+<span id='Stomp-method-emitWrapper'>    /**
+</span>     * @private
+     *
+     * Wrapper to emit the events for the STOMP object
+     *
+     * @returns {void}
+     */
+    var emitWrapper = function(str, obj){
+        thisPointer.emit(str, obj);
+    };
+
+<span id='Stomp-method-getOptions'>    /**
+</span>     * @private
+     *
+     * Returns the process args/options passed into the Client.
+     * This is only used for testing purposes which is why this public function is marked private.
+     *
+     * @returns {Object}        returns the process args/options passed into the Client
+     */
+    var getOptions = function(){
+        return options;
+    };
+
+<span id='Stomp-method-parseCommand'>    /**
+</span>     * @private
+     *
+     * Helper to parse the command from frame
+     *
+     * @param {Object}      data       the frame as a buffer
+     * @returns {String}               returns the command from the frame
+     */
+    var parseCommand = function(data) {
+        var dataStr = data.toString('utf8', 0, data.length);
+        var command = dataStr.split('\n');
+        return command[0];
+    };
+
+<span id='Stomp-method-parseHeaders'>    /**
+</span>     * @private
+     *
+     * Helper to parse the headers from frame
+     *
+     * @param {Object}      rawHeaders       the raw headers from the frame
+     * @returns {Object}                     returns the headers from the frame
+     */
+    var parseHeaders = function(rawHeaders) {
+        var headers = {};
+        var headersSplit = rawHeaders.split('\n');
+
+        for (var i = 0; i &lt; headersSplit.length; i++) {
+            var header = headersSplit[i].split(':');
+            if (header.length &gt; 1) {
+                var headerKey = header.shift().trim();
+                var headerVal = header.join(':').trim();
+                headers[headerKey] = headerVal;
+                continue;
+            }
+            headers[header[0].trim()] = header[1].trim();
+        }
+        return headers;
+    };
+
+<span id='Stomp-method-parseFrame'>    /**
+</span>     * @private
+     *
+     * Helper to parse the key data pieces (headers, command, body) from frame
+     *
+     * @param {Object}      chunk       the frame as a buffer
+     * @returns {Object}                returns the frame as a [StompJS.Frame](#!/api/Frame)
+     */
+    var parseFrame = function(chunk) {
+        if (!stompUtils.isDefined(chunk)) {
+            return null;
+        }
+
+        var command = parseCommand(chunk);
+        var data = chunk.slice(command.length + 1, chunk.length);
+        data = data.toString('utf8', 0, data.length);
+
+        var theRest = data.split('\n\n');
+        var headers = parseHeaders(theRest[0]);
+        var body = theRest.slice(1, theRest.length);
+
+        if ('content-length' in headers) {
+            headers.bytes_message = true;
+        }
+
+        var args = {
+            command: command,
+            headers: headers,
+            body: body
+        };
+
+        var frame = new Frame();
+        var newFrame = frame.buildFrame(args);
+
+        return newFrame;
+    };
+
+<span id='Stomp-method-buildHeaders'>    /**
+</span>     * @private
+     *
+     * Helper to build the headers from the client args/options
+     *
+     * @param {Object}      options     the client args/options
+     * @returns {Object}                returns the headers
+     */
+    var buildHeaders = function(options) {
+        var headers = {};
+        if (stompUtils.isDefined(options.login) &amp;&amp;
+            stompUtils.isDefined(options.passcode)) {
+            headers.login = options.login;
+            headers.passcode = options.passcode;
+        }
+        if (stompUtils.isDefined(options.clientId)) {
+            headers[&quot;client-id&quot;] = options.clientId;
+        }
+        if (stompUtils.isDefined(options.vhost)) {
+            headers.host = options.vhost;
+        }
+        return headers;
+    };
+
+<span id='Stomp-method-sendCommand'>    /**
+</span>     * @private
+     *
+     * Create the STOMP Frame and send the command to the STOMP broker
+     *
+     * @param {String}      command         the command to send
+     * @param {Object}      headers         the headers to send
+     * @param {Object}      body            the body to send
+     * @param {Boolean}     wantReceipt     boolean to indicate that you wish to get a receipt
+     * @returns {Object}                    returns a [StompJS.Frame](#!/api/Frame)
+     */
+    var sendCommand = function(command, headers, body, wantReceipt) {
+        if (!stompUtils.isDefined(wantReceipt)) {
+            wantReceipt = false;
+        }
+
+        if (!stompUtils.isDefined(headers)) {
+            headers = {};
+        }
+
+        var args = {
+            'command': command,
+            'headers': headers,
+            'body': body
+        };
+
+        var frame = new Frame();
+        var newFrame = frame.buildFrame(args, wantReceipt);
+        sendFrame(newFrame);
+
+        return newFrame;
+    };
+
+<span id='Stomp-method-sendFrame'>    /**
+</span>     * @private
+     *
+     * Sends the STOMP frame to the message broker
+     *
+     * @param {String}      frame           the [StompJS.Frame](#!/api/Frame)
+     * @returns {void}
+     */
+    var sendFrame = function(frame) {
+        var frameStr = frame.asString();
+
+        if (frame) {
+            if (frame.headers) {
+                if (frame.headers.login) {
+                    log.debug('attempting to login with: ' + frame.headers.login);
+                    log.debug('login passcode: ' + frame.headers.passcode);  //TODO remove this
+                }
+            }
+        }
+
+        if (socket.write(frameStr) === false) {
+            log.debug('Write buffered');
+        }
+    };
+
+<span id='Stomp-method-isMessage'>    /**
+</span>     * @private
+     *
+     * Determines if the frame headers have a message id which is assigned only if its a message
+     *
+     * @param {String}      frame           the [StompJS.Frame](#!/api/Frame)
+     * @returns {Boolean}                   return *true* if the frame is a message; otherwise, *false*
+     */
+    var isMessage = function(frame) {
+        return (frame.headers !== null &amp;&amp; stompUtils.isDefined(frame.headers['message-id']));
+    };
+
+<span id='Stomp-method-shouldRunMessageCallback'>    /**
+</span>     * @private
+     *
+     * Determines if the message callback function should be ran and runs it if it should
+     *
+     * @param {String}      frame           the [StompJS.Frame](#!/api/Frame)
+     * @returns {Boolean}                   return *true* if the frame is a message; otherwise, *false*
+     */
+    var shouldRunMessageCallback = function(frame) {
+        var subscription = subscribedTo[frame.headers.destination];
+        if (frame.headers.destination !== null &amp;&amp; subscription !== null) {
+            if (subscription.enabled &amp;&amp; subscription.callback !== null &amp;&amp; typeof(subscription.callback) === 'function') {
+                subscription.callback(frame.body, frame.headers);
+            }
+        }
+    };
+
+    return {
+        Client: Client,
+
+        isInitialized: isInitialized,
+        isConnected: isConnected,
+        connect: connect,
+        disconnect: disconnect,
+        subscribe: subscribe,
+        unsubscribe: unsubscribe,
+        send: send,
+        ack: ack,
+        abort: abort,
+        commit: commit,
+        begin: begin,
+        emitWrapper: emitWrapper,
+
+        // exposed for testing purposes only
+        getOptions: getOptions
+    };
+};
+</pre>
+</body>
+</html>

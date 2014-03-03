@@ -1,0 +1,21 @@
+[
+    {
+        "name":"StompJS",
+        "groups": [
+            {
+                "name":"Classes",
+                "classes":[
+                    "Frame",
+                    "Stomp"
+                ]
+            },
+            {
+                "name":"Utilities",
+                "classes":[
+                    "StompUtils",
+                    "StompLogger"
+                ]
+            }
+        ]
+    }
+]

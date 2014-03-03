@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>The source code</title>
+  <link href="../resources/prettify/prettify.css" type="text/css" rel="stylesheet" />
+  <script type="text/javascript" src="../resources/prettify/prettify.js"></script>
+  <style type="text/css">
+    .highlight { display: block; background-color: #ddd; }
+  </style>
+  <script type="text/javascript">
+    function highlight() {
+      document.getElementById(location.hash.replace(/#/, "")).className = "highlight";
+    }
+  </script>
+</head>
+<body onload="prettyPrint(); highlight();">
+  <pre class="prettyprint lang-js"><span id='StompLogger'>/**
+</span> * @class StompLogger
+ * An instance of the StompJS logger
+ *
+ * @type {StompJS.Logger}
+ */
+var StompLogger = module.exports = function(outputDebugInit) {
+    &quot;use strict&quot;;
+
+    var outputDebug = outputDebugInit;
+
+<span id='StompLogger-method-debug'>    /**
+</span>     * Writes a debug message to the console only if the outputDebug flag was also set to true
+     *
+     * @param {String}     message     the message to write to the console
+     * @returns {void}
+     */
+    var debug = function(message) {
+        if (outputDebug) {
+            console.log(&quot;debug: &quot; + message);
+        }
+    };
+
+<span id='StompLogger-method-info'>    /**
+</span>     * Writes a info message to the console
+     *
+     * @param {String}     message     the message to write to the console
+     * @returns {void}
+     */
+    var info = function(message) {
+        console.log(&quot;info: &quot; + message);
+    };
+
+<span id='StompLogger-method-warn'>    /**
+</span>     * Writes a warn message to the console
+     *
+     * @param {String}     message     the message to write to the console
+     * @returns {void}
+     */
+    var warn = function(message) {
+        console.log(&quot;warn: &quot; + message);
+    };
+
+<span id='StompLogger-method-error'>    /**
+</span>     * Writes a error message to the console and kills the process based on die input
+     *
+     * @param {String}     message     the message to write to the console
+     * @param {Boolean}     die        if *true*, then kill the process after writing the message
+     * @returns {void}
+     */
+    var error = function(message, die) {
+        console.log(&quot;error: &quot; + message);
+        if (die) {
+            process.exit(1);
+        }
+    };
+
+<span id='StompLogger-method-die'>    /**
+</span>     * Writes a error message to the console and then kills the process
+     *
+     * @param {String}     message     the message to write to the console
+     * @returns {void}
+     */
+    var die = function(message) {
+        error(message, true);
+    };
+
+    return {
+        debug: debug,
+        info: info,
+        warn: warn,
+        error: error,
+        die: die
+    };
+};
+</pre>
+</body>
+</html>
